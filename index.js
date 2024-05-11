@@ -22,13 +22,12 @@ app.use(
       "http://localhost:5173",
       "https://ph-assignment11-sadatriyad.surge.sh",
       "https://ph-assignment11-sadatriyad.netlify.app",
-      "*", // allow all origins
     ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
+
+
 
 // Routes
 app.get("/", (req, res) => {
@@ -36,14 +35,26 @@ app.get("/", (req, res) => {
 });
 
 async function run() {
-  const QueryHubCollection = client
-    .db("BB-QueryHubDB")
-    .collection("Queries");
+  const QueryHubCollection = client.db("BB-QueryHubDB").collection("Queries");
   try {
     // Get all the data from the collection
-    app.get("/Queries", async (req, res) => {
+    app.get("/queries", async (req, res) => {
       const data = QueryHubCollection.find();
       const result = await data.toArray();
+      res.send(result);
+    });
+
+    // Get recent 6 data from the collection
+    app.get("/queries/recent", async (req, res) => {
+      const data = QueryHubCollection.find().sort({ _id: -1 }).limit(6);
+      const result = await data.toArray();
+      res.send(result);
+    });
+
+    // Add data to the collection
+    app.post("/queries/addQuery", async (req, res) => {
+      const data = req.body;
+      const result = await QueryHubCollection.insertOne(data);
       res.send(result);
     });
 
