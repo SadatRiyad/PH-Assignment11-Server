@@ -35,12 +35,39 @@ app.get("/", (req, res) => {
 });
 
 async function run() {
+  // QueryHubCollection 
   const QueryHubCollection = client.db("BB-QueryHubDB").collection("Queries");
+  
   try {
     // Get all the data from the collection
     app.get("/queries", async (req, res) => {
       const data = QueryHubCollection.find();
       const result = await data.toArray();
+      res.send(result);
+    });
+
+    // get data by id
+    app.get("/queries/id/:id", async (req, res) => {
+      const data = QueryHubCollection.findOne({ _id: new ObjectId(req.params.id) });
+      const result = await data;
+      res.send(result);
+    });
+
+    // put data by id
+    app.put("/queries/id/:id", async (req, res) => {
+      const data = req.body;
+      const result = await QueryHubCollection.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: data },
+      { upsert: true }
+      );
+      res.send(result);
+    });
+
+    // delete data by id
+    app.delete("/queries/id/:id", async (req, res) => {
+      const data = QueryHubCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+      const result = await data;
       res.send(result);
     });
 
@@ -57,6 +84,14 @@ async function run() {
       const result = await QueryHubCollection.insertOne(data);
       res.send(result);
     });
+
+    // Get data by email
+    app.get("/queries/myQueries/:email", async (req, res) => {
+      const data = QueryHubCollection.find({ userEmail: req.params.email }).sort({datePosted: -1});
+      const result = await data.toArray();
+      res.send(result);
+    });
+
 
   } finally {
     // Ensures that the client will close when you finish/error
