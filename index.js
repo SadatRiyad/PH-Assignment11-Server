@@ -27,28 +27,28 @@ app.use(
   })
 );
 
-
-
 // Routes
 app.get("/", (req, res) => {
   res.send("BB-QueryHub server is running");
 });
 
 async function run() {
-  // QueryHubCollection 
+  // QueryHubCollection
   const QueryHubCollection = client.db("BB-QueryHubDB").collection("Queries");
-  
+
   try {
     // Get all the data from the collection
     app.get("/queries", async (req, res) => {
-      const data = QueryHubCollection.find();
+      const data = QueryHubCollection.find().sort({ datePosted: -1 });
       const result = await data.toArray();
       res.send(result);
     });
 
     // get data by id
     app.get("/queries/id/:id", async (req, res) => {
-      const data = QueryHubCollection.findOne({ _id: new ObjectId(req.params.id) });
+      const data = QueryHubCollection.findOne({
+        _id: new ObjectId(req.params.id),
+      });
       const result = await data;
       res.send(result);
     });
@@ -57,16 +57,18 @@ async function run() {
     app.put("/queries/id/:id", async (req, res) => {
       const data = req.body;
       const result = await QueryHubCollection.updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: data },
-      { upsert: true }
+        { _id: new ObjectId(req.params.id) },
+        { $set: data },
+        { upsert: true }
       );
       res.send(result);
     });
 
     // delete data by id
     app.delete("/queries/id/:id", async (req, res) => {
-      const data = QueryHubCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+      const data = QueryHubCollection.deleteOne({
+        _id: new ObjectId(req.params.id),
+      });
       const result = await data;
       res.send(result);
     });
@@ -87,12 +89,54 @@ async function run() {
 
     // Get data by email
     app.get("/queries/myQueries/:email", async (req, res) => {
-      const data = QueryHubCollection.find({ userEmail: req.params.email }).sort({datePosted: -1});
+      const data = QueryHubCollection.find({
+        userEmail: req.params.email,
+      }).sort({ datePosted: -1 });
       const result = await data.toArray();
       res.send(result);
     });
 
+    // add recommendation on queries
+    app.post("/queries/:id/recommendations", async (req, res) => {
+      const { id } = req.params;
+      const {
+        recommendationTitle,
+        recommendedProductName,
+        recommendedProductImageURL,
+        recommendationReason,
+        recommendedUserEmail,
+        recommendedUserName,
+        recommendedUserImageUrl,
+        timestamp,
+      } = req.body;
 
+      const recommendation = {
+        id: new ObjectId(),
+        recommendationTitle,
+        recommendedProductName,
+        recommendedProductImageURL,
+        recommendationReason,
+        recommendedUserEmail,
+        recommendedUserName,
+        recommendedUserImageUrl,
+        timestamp,
+      };
+
+      // Update the query document with a new recommendation
+      const result = await QueryHubCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $push: { recommendations: recommendation },
+          $inc: { recommendationCount: 1 },
+        }
+      );
+
+      if (result.modifiedCount === 1) {
+        res.status(200).json({ message: "Recommendation added successfully" });
+      } else {
+        res.status(500).json({ error: "Failed to add recommendation" });
+      }
+    });
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
