@@ -96,6 +96,66 @@ async function run() {
       res.send(result);
     });
 
+    // all recommendations api
+    app.get("/recommendations", async (req, res) => {
+      const data = QueryHubCollection.find({
+        recommendations: { $exists: true },
+      });
+      const result = await data.toArray();
+      res.send(result);
+    });
+
+    // Delete a recommendation by its ID
+    app.delete("/recommendations/:id", async (req, res) => {
+      try {
+        const recommendationId = req.params.id;
+        const result = await QueryHubCollection.updateOne(
+          { "recommendations.id": new ObjectId(recommendationId) },
+          {
+            $pull: { recommendations: { id: new ObjectId(recommendationId) } },
+            $inc: { recommendationCount: -1 }, // Decrement recommendation count
+          }
+        );
+        if (result.modifiedCount === 1) {
+          res
+            .status(200)
+            .json({ message: "Recommendation deleted successfully" });
+        } else {
+          res.status(404).json({ error: "Recommendation not found" });
+        }
+      } catch (error) {
+        console.error("Error deleting recommendation:", error);
+        res.status(500).json({ error: "Failed to delete recommendation" });
+      }
+    });
+
+    //  my recommendatios api
+    app.get("/recommendations/myRecommendations/:email", async (req, res) => {
+      const data = QueryHubCollection.find({
+        "recommendations.recommendedUserEmail": req.params.email,
+      });
+      const result = await data.toArray();
+      res.send(result);
+    });
+
+    //  recommendatios on only my posted queries by others
+    app.get(
+      "/recommendations/recommendationsForMe/:email",
+      async (req, res) => {
+        try {
+          const data = await QueryHubCollection.find({
+            userEmail: req.params.email,
+            recommendations: { $exists: true, $not: { $size: 0 } }, // Filter out empty recommendations array
+          }).toArray();
+
+          res.send(data);
+        } catch (error) {
+          console.error("Error fetching recommendations:", error);
+          res.status(500).json({ error: "Failed to fetch recommendations" });
+        }
+      }
+    );
+
     // add recommendation on queries
     app.post("/queries/:id/recommendations", async (req, res) => {
       const { id } = req.params;
