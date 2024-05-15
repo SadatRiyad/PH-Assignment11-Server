@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-
+const cookieParser = require('cookie-parser')
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
@@ -27,6 +27,7 @@ const cookieOptions = {
 
 // middleware
 app.use(express.json());
+app.use(cookieParser());
 app.use(
   cors({
     origin: [
@@ -210,10 +211,12 @@ async function run() {
     });
 
     //creating Token
-    app.post("/jwt", logger, async (req, res) => {
+    app.post("/jwt", async (req, res) => {
       const user = req.body;
       console.log("user for token", user);
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET,{
+        expiresIn: "7d",
+      });
 
       res.cookie("token", token, cookieOptions).send({ success: true });
     });
