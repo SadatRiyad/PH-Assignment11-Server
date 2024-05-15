@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const cookieParser = require('cookie-parser')
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
@@ -39,6 +39,24 @@ app.use(
   })
 );
 
+// logger
+const logger = (req, res, next) => {
+  const token = req.cookies?.token;
+  console.log("value inside logger", token);
+  if (!token) {
+    return res.status(401).send({ error: "Unauthorized" });
+  }
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      console.log(err)
+      return res.status(401).send({ error: "Unauthorized" });
+    }
+    console.log("value in the token", decoded);
+    req.user = decoded;
+    next();
+  });
+};
+
 // Routes
 app.get("/", (req, res) => {
   res.send("BB-QueryHub server is running");
@@ -57,7 +75,7 @@ async function run() {
     });
 
     // get data by id
-    app.get("/queries/id/:id", async (req, res) => {
+    app.get("/queries/id/:id", logger, async (req, res) => {
       const data = QueryHubCollection.findOne({
         _id: new ObjectId(req.params.id),
       });
@@ -100,7 +118,7 @@ async function run() {
     });
 
     // Get data by email
-    app.get("/queries/myQueries/:email", async (req, res) => {
+    app.get("/queries/myQueries/:email", logger, async (req, res) => {
       const data = QueryHubCollection.find({
         userEmail: req.params.email,
       }).sort({ datePosted: -1 });
@@ -109,7 +127,7 @@ async function run() {
     });
 
     // all recommendations api
-    app.get("/recommendations", async (req, res) => {
+    app.get("/recommendations", logger, async (req, res) => {
       const data = QueryHubCollection.find({
         recommendations: { $exists: true },
       });
@@ -142,17 +160,22 @@ async function run() {
     });
 
     //  my recommendatios api
-    app.get("/recommendations/myRecommendations/:email", async (req, res) => {
-      const data = QueryHubCollection.find({
-        "recommendations.recommendedUserEmail": req.params.email,
-      });
-      const result = await data.toArray();
-      res.send(result);
-    });
+    app.get(
+      "/recommendations/myRecommendations/:email",
+      logger,
+      async (req, res) => {
+        const data = QueryHubCollection.find({
+          "recommendations.recommendedUserEmail": req.params.email,
+        });
+        const result = await data.toArray();
+        res.send(result);
+      }
+    );
 
     //  recommendatios on only my posted queries by others
     app.get(
       "/recommendations/recommendationsForMe/:email",
+      logger,
       async (req, res) => {
         try {
           const data = await QueryHubCollection.find({
@@ -214,7 +237,7 @@ async function run() {
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       console.log("user for token", user);
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET,{
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "7d",
       });
 
