@@ -48,7 +48,7 @@ const logger = (req, res, next) => {
   }
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
-      console.log(err)
+      console.log(err);
       return res.status(401).send({ error: "Unauthorized" });
     }
     console.log("value in the token", decoded);
@@ -84,7 +84,7 @@ async function run() {
     });
 
     // put data by id
-    app.put("/queries/id/:id", async (req, res) => {
+    app.put("/queries/id/:id", logger, async (req, res) => {
       const data = req.body;
       const result = await QueryHubCollection.updateOne(
         { _id: new ObjectId(req.params.id) },
@@ -111,7 +111,7 @@ async function run() {
     });
 
     // Add data to the collection
-    app.post("/queries/addQuery", async (req, res) => {
+    app.post("/queries/addQuery", logger, async (req, res) => {
       const data = req.body;
       const result = await QueryHubCollection.insertOne(data);
       res.send(result);
@@ -119,6 +119,10 @@ async function run() {
 
     // Get data by email
     app.get("/queries/myQueries/:email", logger, async (req, res) => {
+      // give a status if user is using others cookies
+      if (req.user.email !== req.params.email) {
+        return res.status(403).send({ error: "Forbidden Access" });
+      }
       const data = QueryHubCollection.find({
         userEmail: req.params.email,
       }).sort({ datePosted: -1 });
@@ -136,7 +140,7 @@ async function run() {
     });
 
     // Delete a recommendation by its ID
-    app.delete("/recommendations/:id", async (req, res) => {
+    app.delete("/recommendations/:id", logger, async (req, res) => {
       try {
         const recommendationId = req.params.id;
         const result = await QueryHubCollection.updateOne(
@@ -159,16 +163,43 @@ async function run() {
       }
     });
 
-    //  my recommendatios api
+    // Get recommendations made by a specific user
     app.get(
       "/recommendations/myRecommendations/:email",
       logger,
       async (req, res) => {
-        const data = QueryHubCollection.find({
-          "recommendations.recommendedUserEmail": req.params.email,
-        });
-        const result = await data.toArray();
-        res.send(result);
+        const userEmail = req.params.email;
+        if (req.user.email !== req.params.email) {
+          return res.status(403).send({ error: "Forbidden Access" });
+        }
+
+        try {
+          const data = await QueryHubCollection.find({
+            "recommendations.recommendedUserEmail": userEmail,
+          }).toArray();
+
+          // Filter out only the recommendations where the recommendedUserEmail matches the user's email
+          const userRecommendations = data.reduce((acc, query) => {
+            const filteredRecommendations = query.recommendations.filter(
+              (recommendation) =>
+                recommendation.recommendedUserEmail === userEmail
+            );
+            if (filteredRecommendations.length > 0) {
+              acc.push({
+                ...query,
+                recommendations: filteredRecommendations,
+              });
+            }
+            return acc;
+          }, []);
+
+          res.json(userRecommendations);
+        } catch (error) {
+          console.error("Error fetching user recommendations:", error);
+          res
+            .status(500)
+            .json({ error: "Failed to fetch user recommendations" });
+        }
       }
     );
 
@@ -177,6 +208,9 @@ async function run() {
       "/recommendations/recommendationsForMe/:email",
       logger,
       async (req, res) => {
+        if (req.user.email !== req.params.email) {
+          return res.status(403).send({ error: "Forbidden Access" });
+        }
         try {
           const data = await QueryHubCollection.find({
             userEmail: req.params.email,
@@ -192,7 +226,7 @@ async function run() {
     );
 
     // add recommendation on queries
-    app.post("/queries/:id/recommendations", async (req, res) => {
+    app.post("/queries/:id/recommendations", logger, async (req, res) => {
       const { id } = req.params;
       const {
         recommendationTitle,
